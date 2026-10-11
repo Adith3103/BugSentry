@@ -1660,6 +1660,13 @@ body {
   line-height: 1.5;
 }
 
+.analysis-summary {
+  margin: 0 0 9px;
+  color: #d5c9ff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .diagnostic-list {
   display: grid;
   gap: 9px;
@@ -1693,6 +1700,11 @@ body {
   background: #3b2029;
   font-size: 10px;
   font-weight: 600;
+}
+
+.diagnostic-severity.warning {
+  color: #f1d18a;
+  background: #3a321d;
 }
 
 .diagnostic-line {

@@ -82,6 +82,7 @@ function App() {
   const [analysisState, setAnalysisState] = useState("idle");
   const [analysisError, setAnalysisError] = useState("");
   const [analysisDiagnostics, setAnalysisDiagnostics] = useState(null);
+  const [analysisTotalIssues, setAnalysisTotalIssues] = useState(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -232,6 +233,7 @@ function App() {
 
     if (!pythonCode.trim()) {
       setAnalysisDiagnostics(null);
+      setAnalysisTotalIssues(null);
       setAnalysisError("Enter Python code before starting the analysis.");
       setAnalysisState("error");
       return;
@@ -240,6 +242,7 @@ function App() {
     setAnalysisState("loading");
     setAnalysisError("");
     setAnalysisDiagnostics(null);
+    setAnalysisTotalIssues(null);
 
     try {
       const response = await fetch(`${ANALYSIS_API_URL}/api/analyze/python`, {
@@ -252,11 +255,16 @@ function App() {
       if (!response.ok) {
         throw new Error(result.error || "The Python analysis request failed.");
       }
-      if (!Array.isArray(result.diagnostics)) {
+      if (
+        !Array.isArray(result.diagnostics) ||
+        !Number.isInteger(result.totalIssues) ||
+        result.totalIssues !== result.diagnostics.length
+      ) {
         throw new Error("The analyzer returned an unexpected response.");
       }
 
       setAnalysisDiagnostics(result.diagnostics);
+      setAnalysisTotalIssues(result.totalIssues);
       setAnalysisState("success");
     } catch (error) {
       setAnalysisError(error.message || "Could not connect to the Python analyzer.");
@@ -571,7 +579,7 @@ function App() {
               />
               <div className="analyzer-controls">
                 <p id="analyzer-help">
-                  Checks syntax and literal-zero division; it does not prove code is bug-free.
+                  Checks syntax, unresolved calls, and selected division risks; it does not prove code is bug-free.
                 </p>
                 <button
                   className="primary-button analyzer-submit"
@@ -600,30 +608,42 @@ function App() {
                 </div>
               )}
               {analysisState === "success" && analysisDiagnostics.length > 0 && (
-                <div className="diagnostic-list">
-                  {analysisDiagnostics.map((diagnostic, index) => (
-                    <article className="diagnostic-card" key={`${diagnostic.type}-${diagnostic.line ?? index}-${index}`}>
-                      <div className="diagnostic-meta">
-                        <strong className="diagnostic-type">
-                          {diagnostic.type.replaceAll("_", " ")}
-                        </strong>
-                        <span className={`diagnostic-severity ${diagnostic.severity.toLowerCase()}`}>
-                          {diagnostic.severity}
-                        </span>
-                        {Number.isInteger(diagnostic.line) && (
-                          <span className="diagnostic-line">Line {diagnostic.line}</span>
-                        )}
-                      </div>
-                      <p>{diagnostic.explanation}</p>
-                      {diagnostic.suggestedFix && (
-                        <div className="diagnostic-fix">
-                          <strong>Suggested fix</strong>
-                          <p>{diagnostic.suggestedFix}</p>
-                        </div>
-                      )}
-                    </article>
-                  ))}
-                </div>
+                <>
+                  <p className="analysis-summary" role="status">
+                    {analysisTotalIssues} {analysisTotalIssues === 1 ? "issue" : "issues"} detected
+                  </p>
+                  <div className="diagnostic-list">
+                    {analysisDiagnostics.map((diagnostic, index) => {
+                      const isPotential = diagnostic.type.startsWith("potential_");
+                      const diagnosticName = diagnostic.type
+                        .replace(/^potential_/, "")
+                        .replaceAll("_", " ");
+
+                      return (
+                        <article className="diagnostic-card" key={`${diagnostic.type}-${diagnostic.line ?? index}-${index}`}>
+                          <div className="diagnostic-meta">
+                            <strong className="diagnostic-type">
+                              {isPotential ? `Potential issue: ${diagnosticName}` : diagnosticName}
+                            </strong>
+                            <span className={`diagnostic-severity ${diagnostic.severity.toLowerCase()}`}>
+                              {diagnostic.severity}
+                            </span>
+                            {Number.isInteger(diagnostic.line) && (
+                              <span className="diagnostic-line">Line {diagnostic.line}</span>
+                            )}
+                          </div>
+                          <p>{diagnostic.explanation}</p>
+                          {diagnostic.suggestedFix && (
+                            <div className="diagnostic-fix">
+                              <strong>Suggested fix</strong>
+                              <p>{diagnostic.suggestedFix}</p>
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           </section>
